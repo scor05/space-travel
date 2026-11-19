@@ -56,8 +56,6 @@ impl Framebuffer {
         }
     }
 
-    /// Writes a shaded fragment only when it is closer than the fragment that
-    /// is already at this pixel.
     pub fn set_fragment(&mut self, x: i32, y: i32, depth: f32, color: Color) {
         if x < 0 || y < 0 || x >= self.width as i32 || y >= self.height as i32 {
             return;
@@ -75,8 +73,8 @@ impl Framebuffer {
         let original = self.emissive_buffer.clone();
         let mut wide_glow = original.clone();
         let mut near_glow = original.clone();
-        wide_glow.blur_gaussian(31);
-        near_glow.blur_gaussian(11);
+        wide_glow.blur_gaussian(75);
+        near_glow.blur_gaussian(30);
 
         let bounds = Rectangle::new(0.0, 0.0, self.width as f32, self.height as f32);
         self.color_buffer.clear_background(self.background_color);

@@ -129,7 +129,6 @@ impl Model {
                 for polygon in &group.polys {
                     let indices = &polygon.0;
 
-                    // Triangulate polygons as a fan: (0, 1, 2), (0, 2, 3), ...
                     for index in 1..indices.len().saturating_sub(1) {
                         triangles.push([indices[0].0, indices[index].0, indices[index + 1].0]);
                     }

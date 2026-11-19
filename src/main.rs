@@ -16,7 +16,8 @@ use shaders::{FragmentShader, GAS_GIANT_SHADER, ROCKY_PLANET_SHADER, STAR_SHADER
 use std::f32::consts::PI;
 use std::time::Instant;
 
-const MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/sphere.obj");
+const SHIP_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/nave.obj");
+const SPHERE_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/sphere.obj");
 const MOVE_SPEED: f32 = 0.1;
 const ROT_SPEED: f32 = PI / 100.0;
 const PIXELS_PER_UNIT: f32 = 25.0;
@@ -129,8 +130,10 @@ fn render(
 }
 
 fn main() {
-    let model = Model::load(MODEL_PATH)
-        .unwrap_or_else(|error| panic!("Could not load {MODEL_PATH}: {error}"));
+    let ship_model = Model::load(SHIP_MODEL_PATH)
+        .unwrap_or_else(|error| panic!("Could not load {SHIP_MODEL_PATH}: {error}"));
+    let sphere_model = Model::load(SPHERE_MODEL_PATH)
+        .unwrap_or_else(|error| panic!("Could not load {SPHERE_MODEL_PATH}: {error}"));
 
     let window_width = 800;
     let window_height = 600;
@@ -157,7 +160,7 @@ fn main() {
 
     let mut translation = Vector3::zero();
     let mut rotation = Vector3::zero();
-    let mut scale = 10.0_f32;
+    let mut scale = 1.0_f32;
     let shaders = shaders::registry();
     let mut active_shader = STAR_SHADER.to_owned();
     let start_time = Instant::now();
@@ -182,13 +185,6 @@ fn main() {
         }
         if window.is_key_down(KeyboardKey::KEY_UP) {
             translation.y += MOVE_SPEED;
-        }
-
-        if window.is_key_pressed(KeyboardKey::KEY_Q) {
-            scale += 0.1;
-        }
-        if window.is_key_pressed(KeyboardKey::KEY_E) {
-            scale = (scale - 0.1).max(0.5);
         }
 
         if window.is_key_down(KeyboardKey::KEY_A) {
@@ -227,7 +223,7 @@ fn main() {
             translation,
             scale,
             rotation,
-            &model,
+            &ship_model,
             pipeline,
             shader,
             &uniforms,

@@ -44,15 +44,6 @@ fn star(fragment: &Fragment, uniforms: &Uniforms) -> Color {
         3,
         203,
     );
-    let magnetic_patches = smoothstep(
-        0.66,
-        0.82,
-        fbm(
-            position * 2.4 + Vector3::new(time * 0.015, 0.0, -time * 0.01),
-            3,
-            811,
-        ),
-    );
 
     let base = mix(
         ColorF::rgb(0.008, 0.015, 0.16),
@@ -72,27 +63,8 @@ fn star(fragment: &Fragment, uniforms: &Uniforms) -> Color {
         ColorF::splat(turbulence * (0.08 + flicker * 0.08)),
         granulated,
     );
-    let patched = mix(
-        active_surface,
-        ColorF::rgb(0.025, 0.008, 0.14),
-        magnetic_patches * 0.72,
-    );
 
-    let flares = flare_field(position, time);
-    let flare_blue = combine(
-        ColorF::rgb(0.12, 0.66, 1.0),
-        ColorF::BLACK,
-        ColorF::splat(flares * 0.82),
-        patched,
-    );
-    let flare_core = combine(
-        ColorF::rgb(0.88, 0.98, 1.0),
-        ColorF::BLACK,
-        ColorF::splat(smoothstep(0.58, 0.92, flares)),
-        flare_blue,
-    );
-
-    flare_core.to_color()
+    active_surface.to_color()
 }
 
 fn rocky_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
@@ -235,48 +207,6 @@ fn gas_giant(fragment: &Fragment, uniforms: &Uniforms) -> Color {
     .to_color()
 }
 
-fn flare_field(position: Vector3, time: f32) -> f32 {
-    let longitude = position.z.atan2(position.x);
-    let latitude = position.y.clamp(-1.0, 1.0).asin();
-    let flare_data = [
-        (-1.15_f32, 0.24_f32, 0.00_f32, 4103_u32),
-        (-2.05_f32, -0.20_f32, 0.37_f32, 5417_u32),
-        (-0.52_f32, 0.02_f32, 0.71_f32, 6857_u32),
-    ];
-    let mut field: f32 = 0.0;
-
-    for (center_longitude, center_latitude, offset, seed) in flare_data {
-        let cycle = (time * 0.105 + offset).fract();
-        let formation = smoothstep(0.0, 0.16, cycle);
-        let decay = 1.0 - smoothstep(0.66, 1.0, cycle);
-        let envelope = formation * decay;
-        let radius = 0.10 + cycle * 0.72;
-
-        let longitude_delta =
-            wrap_angle(longitude - center_longitude) * center_latitude.cos() * 0.82;
-        let latitude_delta = (latitude - center_latitude) * 1.65;
-        let ellipse = (longitude_delta * longitude_delta + latitude_delta * latitude_delta).sqrt();
-        let breakup = (fbm(
-            position * 14.0 + Vector3::new(offset * 9.0, time * 0.09, -offset * 5.0),
-            2,
-            seed,
-        ) - 0.5)
-            * 0.15;
-        let loop_line = 1.0 - smoothstep(0.025, 0.105, (ellipse + breakup - radius).abs());
-        let upper_arc = smoothstep(-0.16, 0.10, latitude_delta + radius * 0.32);
-        let footpoint = 1.0 - smoothstep(0.0, 0.11, ellipse);
-
-        field = field.max((loop_line * upper_arc + footpoint * 0.75) * envelope);
-    }
-
-    field.clamp(0.0, 1.0)
-}
-
-fn wrap_angle(angle: f32) -> f32 {
-    let tau = std::f32::consts::TAU;
-    (angle + std::f32::consts::PI).rem_euclid(tau) - std::f32::consts::PI
-}
-
 #[derive(Clone, Copy)]
 struct ColorF {
     r: f32,
@@ -313,7 +243,6 @@ impl std::ops::Mul<f32> for ColorF {
     }
 }
 
-/// PS2-style fixed-function color equation: (A - B) * C + D.
 fn combine(a: ColorF, b: ColorF, c: ColorF, d: ColorF) -> ColorF {
     ColorF::rgb(
         ((a.r - b.r) * c.r + d.r).clamp(0.0, 1.0),
