@@ -76,6 +76,7 @@ pub trait TrianglePipeline {
         framebuffer: &mut Framebuffer,
         triangle: &Triangle,
         shader: FragmentShader,
+        emissive: bool,
         uniforms: &Uniforms,
     );
 }

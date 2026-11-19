@@ -40,10 +40,11 @@ impl TrianglePipeline for FilledBarycentric {
         framebuffer: &mut Framebuffer,
         triangle: &Triangle,
         shader: FragmentShader,
+        emissive: bool,
         uniforms: &Uniforms,
     ) {
         for fragment in self.rasterize(triangle) {
-            framebuffer.shade_fragment(fragment.x, fragment.y, fragment.depth, || {
+            framebuffer.shade_fragment(fragment.x, fragment.y, fragment.depth, emissive, || {
                 shader(&fragment, uniforms)
             });
         }

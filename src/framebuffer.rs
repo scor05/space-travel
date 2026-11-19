@@ -54,7 +54,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn shade_fragment<F>(&mut self, x: i32, y: i32, depth: f32, shade: F)
+    pub fn shade_fragment<F>(&mut self, x: i32, y: i32, depth: f32, emissive: bool, shade: F)
     where
         F: FnOnce() -> Color,
     {
@@ -67,7 +67,11 @@ impl Framebuffer {
             let color = shade();
             self.depth_buffer[index] = depth;
             self.color_buffer.draw_pixel(x, y, color);
-            self.emissive_buffer.draw_pixel(x, y, color);
+            if emissive {
+                self.emissive_buffer.draw_pixel(x, y, color);
+            } else {
+                self.emissive_buffer.draw_pixel(x, y, Color::BLANK);
+            }
         }
     }
 
@@ -79,7 +83,6 @@ impl Framebuffer {
         near_glow.blur_gaussian(30);
 
         let bounds = Rectangle::new(0.0, 0.0, self.width as f32, self.height as f32);
-        self.color_buffer.clear_background(self.background_color);
         self.color_buffer
             .draw(&wide_glow, bounds, bounds, Color::new(45, 105, 255, 150));
         self.color_buffer

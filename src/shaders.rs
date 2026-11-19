@@ -30,7 +30,7 @@ fn star(fragment: &Fragment, uniforms: &Uniforms) -> Color {
     let time = uniforms.time;
 
     let warp = fbm(
-        position * 3.2 + Vector3::new(time * 0.05, -time * 0.03, time * 0.04),
+        position * 3.2 + Vector3::new(time * 0.15, -time * 0.13, time * 0.10),
         3,
         17,
     );
@@ -97,9 +97,9 @@ fn rocky_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
     let ice_mask = smoothstep(0.68, 0.84, position.y.abs() + (detail - 0.5) * 0.12);
     surface = mix(surface, ColorF::rgb(0.72, 0.88, 0.94), ice_mask);
 
-    let cloud_point = rotate_y(position, uniforms.time * 0.045);
+    let cloud_point = rotate_y(position, uniforms.time * 0.1);
     let clouds = fbm(
-        cloud_point * 7.5 + Vector3::new(uniforms.time * 0.025, 0.0, 0.0),
+        cloud_point * 7.5 + Vector3::new(uniforms.time * 0.25, 0.0, 0.0),
         3,
         1501,
     );
@@ -148,9 +148,9 @@ fn rocky_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
 
 fn gas_giant(fragment: &Fragment, uniforms: &Uniforms) -> Color {
     let position = normalize(fragment.position);
-    let flowing = rotate_y(position, uniforms.time * 0.025);
+    let flowing = rotate_y(position, uniforms.time * 0.15);
     let broad_noise = fbm(
-        flowing * 4.0 + Vector3::new(uniforms.time * 0.018, 0.0, 0.0),
+        flowing * 4.0 + Vector3::new(uniforms.time * 0.3, 0.0, 0.0),
         3,
         2401,
     );

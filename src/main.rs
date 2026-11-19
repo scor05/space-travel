@@ -1,26 +1,39 @@
 mod algorithms;
+mod camera;
 mod framebuffer;
 mod line;
 mod model;
 mod procedural;
 mod shaders;
+mod worldobjects;
 
 use algorithms::barycentric::FilledBarycentric;
 use algorithms::scanline::FilledScanline;
 use algorithms::triangle::{Triangle, TriangleMode, TrianglePipeline};
 use algorithms::wireframe::WireFrame;
+use camera::Camera;
 use framebuffer::Framebuffer;
 use model::Model;
 use raylib::prelude::*;
-use shaders::{FragmentShader, GAS_GIANT_SHADER, ROCKY_PLANET_SHADER, STAR_SHADER, Uniforms};
+use shaders::Uniforms;
 use std::f32::consts::PI;
 use std::time::Instant;
+use worldobjects::WorldObject;
 
 const SHIP_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/nave.obj");
 const SPHERE_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/sphere.obj");
-const MOVE_SPEED: f32 = 0.1;
-const ROT_SPEED: f32 = PI / 100.0;
-const PIXELS_PER_UNIT: f32 = 15.0;
+const STAR_SCALE: f32 = 30.0;
+const STAR_ROTATION_SPEED: f32 = PI / 40.0;
+const PLANET_COUNT: usize = 2;
+
+const PLANET_1_SCALE: f32 = 7.0;
+const PLANET_2_SCALE: f32 = 12.0;
+const PLANET_1_ORBIT_RADIUS: f32 = 6.0;
+const PLANET_2_ORBIT_RADIUS: f32 = 12.0;
+const PLANET_1_ORBIT_SPEED: f32 = 3.0;
+const PLANET_2_ORBIT_SPEED: f32 = 5.0;
+const PLANET_1_ROTATION_SPEED: f32 = PI / 20.0;
+const PLANET_2_ROTATION_SPEED: f32 = PI / 30.0;
 
 fn matrix_mult(mat: &[Vector3; 3], vec: Vector3) -> Vector3 {
     let mut result = Vector3::zero();
@@ -55,17 +68,15 @@ fn transform(
 
 fn render(
     framebuffer: &mut Framebuffer,
-    translation: Vector3,
-    scale: f32,
-    rotation: Vector3,
-    model: &Model,
+    mesh: &Model,
+    object: &WorldObject,
+    camera: &Camera,
     pipeline: &dyn TrianglePipeline,
-    shader: FragmentShader,
     uniforms: &Uniforms,
 ) {
-    let (sinx, cosx) = rotation.x.sin_cos();
-    let (siny, cosy) = rotation.y.sin_cos();
-    let (sinz, cosz) = rotation.z.sin_cos();
+    let (sinx, cosx) = object.rotation.x.sin_cos();
+    let (siny, cosy) = object.rotation.y.sin_cos();
+    let (sinz, cosz) = object.rotation.z.sin_cos();
 
     let rot_x: [Vector3; 3] = [
         Vector3::new(1.0, 0.0, 0.0),
@@ -83,51 +94,53 @@ fn render(
         Vector3::new(0.0, 0.0, 1.0),
     ];
 
-    let transformed_vertices: Vec<Vector3> = model
+    let transformed_vertices: Vec<Option<Vector3>> = mesh
         .vertices
         .iter()
         .map(|vertex| {
             let transformed = transform(
                 *vertex,
-                translation,
+                object.position,
                 &rot_x,
                 &rot_y,
                 &rot_z,
-                scale,
-                model.center,
+                object.scale,
+                mesh.center,
             );
 
-            Vector3::new(
-                framebuffer.width as f32 * 0.5 + transformed.x * PIXELS_PER_UNIT,
-                framebuffer.height as f32 * 0.5 - transformed.y * PIXELS_PER_UNIT,
-                transformed.z,
-            )
+            let view_position = camera.world_to_view(transformed);
+            camera.project(view_position, framebuffer.width, framebuffer.height)
         })
         .collect();
 
-    for indices in &model.triangles {
-        let projected = [
+    for indices in &mesh.triangles {
+        let (Some(first), Some(second), Some(third)) = (
             transformed_vertices[indices[0]],
             transformed_vertices[indices[1]],
             transformed_vertices[indices[2]],
-        ];
+        ) else {
+            continue;
+        };
+
+        let projected = [first, second, third];
 
         pipeline.render(
             framebuffer,
             &Triangle {
                 vertices: projected,
                 positions: [
-                    model.vertices[indices[0]],
-                    model.vertices[indices[1]],
-                    model.vertices[indices[2]],
+                    mesh.vertices[indices[0]],
+                    mesh.vertices[indices[1]],
+                    mesh.vertices[indices[2]],
                 ],
                 colors: [
-                    model.colors[indices[0]],
-                    model.colors[indices[1]],
-                    model.colors[indices[2]],
+                    mesh.colors[indices[0]],
+                    mesh.colors[indices[1]],
+                    mesh.colors[indices[2]],
                 ],
             },
-            shader,
+            object.shader,
+            object.emissive,
             uniforms,
         );
     }
@@ -139,12 +152,12 @@ fn main() {
     let sphere_model = Model::load(SPHERE_MODEL_PATH)
         .unwrap_or_else(|error| panic!("Could not load {SPHERE_MODEL_PATH}: {error}"));
 
-    let window_width = 800;
-    let window_height = 600;
+    let window_width = 600;
+    let window_height = 400;
 
     let (mut window, raylib_thread) = raylib::init()
         .size(window_width, window_height)
-        .title("OBJ Renderer")
+        .title("Space Travel :D")
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
     window.set_target_fps(60);
@@ -159,90 +172,84 @@ fn main() {
     let scanline = FilledScanline;
     let barycentric = FilledBarycentric;
 
-    let mode = TriangleMode::FilledBarycentric;
+    let mode = TriangleMode::FilledScanline;
     let pipeline: &dyn TrianglePipeline = match mode {
         TriangleMode::Wireframe => &wireframe,
         TriangleMode::FilledBarycentric => &barycentric,
         TriangleMode::FilledScanline => &scanline,
     };
 
-    let mut translation = Vector3::zero();
-    let mut rotation = Vector3::zero();
-    let mut ship_scale = 1.0_f32;
-    let mut planet_scale = 10_f32;
-    let mut star_scale = 10_f32;
     let shaders = shaders::registry();
-    let mut active_shader = STAR_SHADER.to_owned();
     let start_time = Instant::now();
+    let system_center: Vector3 = Vector3::new(10.0, 0.0, 10.0);
+    let mut camera = Camera::new(Vector3::new(10.0, 0.0, -40.0));
+
+    // plano elíptico como y=0
+    // TODO: sumarle 2 para contar la nave también
+    let meshes: [&Model; PLANET_COUNT + 1] = [&sphere_model, &sphere_model, &sphere_model];
+
+    // la estrella es el primer elemento, con base a él se calculan todos
+    let objects: [&WorldObject; PLANET_COUNT + 1] = [
+        &WorldObject {
+            index: 0,
+            position: system_center,
+            scale: STAR_SCALE,
+            rotation: Vector3::zero(),
+            shader: shaders["Neutron star"],
+            emissive: true,
+            orbit_radius: 0.0,
+            orbit_speed: 0.0,
+            rotation_speed: STAR_ROTATION_SPEED,
+        },
+        &WorldObject {
+            index: 1,
+            position: system_center
+                + Vector3::new(
+                    STAR_SCALE + PLANET_1_ORBIT_RADIUS,
+                    0.0,
+                    STAR_SCALE + PLANET_1_ORBIT_RADIUS,
+                ),
+            rotation: Vector3::zero(),
+            scale: PLANET_1_SCALE,
+            shader: shaders["Ocean planet"],
+            emissive: false,
+            orbit_radius: PLANET_1_ORBIT_RADIUS,
+            orbit_speed: PLANET_1_ORBIT_SPEED,
+            rotation_speed: PLANET_1_ROTATION_SPEED,
+        },
+        &WorldObject {
+            index: 2,
+            position: system_center
+                + Vector3::new(
+                    -(STAR_SCALE + PLANET_2_ORBIT_RADIUS),
+                    0.0,
+                    STAR_SCALE + PLANET_2_ORBIT_RADIUS,
+                ),
+            rotation: Vector3::zero(),
+            scale: PLANET_2_SCALE,
+            shader: shaders["Gas giant"],
+            emissive: false,
+            orbit_radius: PLANET_2_ORBIT_RADIUS,
+            orbit_speed: PLANET_2_ORBIT_SPEED,
+            rotation_speed: PLANET_2_ROTATION_SPEED,
+        },
+    ];
 
     while !window.window_should_close() {
-        if window.is_key_pressed(KeyboardKey::KEY_ONE) {
-            active_shader = STAR_SHADER.to_owned();
-        } else if window.is_key_pressed(KeyboardKey::KEY_TWO) {
-            active_shader = ROCKY_PLANET_SHADER.to_owned();
-        } else if window.is_key_pressed(KeyboardKey::KEY_THREE) {
-            active_shader = GAS_GIANT_SHADER.to_owned();
-        }
-
-        if window.is_key_down(KeyboardKey::KEY_RIGHT) {
-            translation.x += MOVE_SPEED;
-        }
-        if window.is_key_down(KeyboardKey::KEY_LEFT) {
-            translation.x -= MOVE_SPEED;
-        }
-        if window.is_key_down(KeyboardKey::KEY_DOWN) {
-            translation.y -= MOVE_SPEED;
-        }
-        if window.is_key_down(KeyboardKey::KEY_UP) {
-            translation.y += MOVE_SPEED;
-        }
-
-        if window.is_key_down(KeyboardKey::KEY_A) {
-            rotation.y -= ROT_SPEED;
-        }
-        if window.is_key_down(KeyboardKey::KEY_D) {
-            rotation.y += ROT_SPEED;
-        }
-
-        if window.is_key_down(KeyboardKey::KEY_W) {
-            rotation.x += ROT_SPEED;
-        }
-        if window.is_key_down(KeyboardKey::KEY_S) {
-            rotation.x -= ROT_SPEED;
-        }
-
-        if window.is_key_down(KeyboardKey::KEY_Z) {
-            rotation.z -= ROT_SPEED;
-        }
-        if window.is_key_down(KeyboardKey::KEY_X) {
-            rotation.z += ROT_SPEED;
-        }
+        camera.update(&window, window.get_frame_time());
 
         framebuffer.clear();
 
-        let shader = *shaders
-            .get(&active_shader)
-            .expect("active shader must exist in the shader registry");
         let uniforms = Uniforms {
             time: start_time.elapsed().as_secs_f32(),
-            light_position: Vector3::new(-3.0, 3.0, -3.0),
+            light_position: system_center,
         };
 
-        render(
-            &mut framebuffer,
-            translation,
-            star_scale,
-            rotation,
-            &sphere_model,
-            pipeline,
-            shader,
-            &uniforms,
-        );
-
-        if active_shader == STAR_SHADER {
-            framebuffer.apply_bloom();
+        for (mesh, obj) in meshes.iter().zip(objects.iter()) {
+            render(&mut framebuffer, mesh, obj, &camera, pipeline, &uniforms);
         }
 
+        framebuffer.apply_bloom();
         framebuffer.swap_buffers(&mut window, &raylib_thread, &mut display_texture);
     }
 }

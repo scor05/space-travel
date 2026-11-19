@@ -11,6 +11,7 @@ impl TrianglePipeline for WireFrame {
         framebuffer: &mut Framebuffer,
         triangle: &Triangle,
         _shader: FragmentShader,
+        emissive: bool,
         _uniforms: &Uniforms,
     ) {
         let [first, second, third] = triangle.vertices;
