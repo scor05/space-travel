@@ -20,9 +20,9 @@ const SHIP_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/n
 const SPHERE_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/sphere.obj");
 const MOVE_SPEED: f32 = 0.1;
 const ROT_SPEED: f32 = PI / 100.0;
-const PIXELS_PER_UNIT: f32 = 25.0;
+const PIXELS_PER_UNIT: f32 = 15.0;
 
-fn matrix_mult(mat: Vec<Vector3>, vec: Vector3) -> Vector3 {
+fn matrix_mult(mat: &[Vector3; 3], vec: Vector3) -> Vector3 {
     let mut result = Vector3::zero();
     result.x += mat[0].x * vec.x + mat[0].y * vec.y + mat[0].z * vec.z;
     result.y += mat[1].x * vec.x + mat[1].y * vec.y + mat[1].z * vec.z;
@@ -34,44 +34,18 @@ fn matrix_mult(mat: Vec<Vector3>, vec: Vector3) -> Vector3 {
 fn transform(
     vertex: Vector3,
     translation: Vector3,
+    rotx: &[Vector3; 3],
+    roty: &[Vector3; 3],
+    rotz: &[Vector3; 3],
     scale: f32,
-    rotation: Vector3,
     center: Vector3,
 ) -> Vector3 {
     let mut new_vertex = vertex;
     new_vertex -= center;
 
-    if rotation.x != 0.0 {
-        let (sin_theta, cos_theta) = rotation.x.sin_cos();
-        let rot_matrix: Vec<Vector3> = vec![
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(0.0, cos_theta, -sin_theta),
-            Vector3::new(0.0, sin_theta, cos_theta),
-        ];
-
-        new_vertex = matrix_mult(rot_matrix, new_vertex);
-    }
-
-    if rotation.y != 0.0 {
-        let (sin_theta, cos_theta) = rotation.y.sin_cos();
-        let rot_matrix: Vec<Vector3> = vec![
-            Vector3::new(cos_theta, 0.0, sin_theta),
-            Vector3::new(0.0, 1.0, 0.0),
-            Vector3::new(-sin_theta, 0.0, cos_theta),
-        ];
-        new_vertex = matrix_mult(rot_matrix, new_vertex);
-    }
-
-    if rotation.z != 0.0 {
-        let (sin_theta, cos_theta) = rotation.z.sin_cos();
-        let rot_matrix: Vec<Vector3> = vec![
-            Vector3::new(cos_theta, -sin_theta, 0.0),
-            Vector3::new(sin_theta, cos_theta, 0.0),
-            Vector3::new(0.0, 0.0, 1.0),
-        ];
-
-        new_vertex = matrix_mult(rot_matrix, new_vertex);
-    }
+    new_vertex = matrix_mult(rotx, new_vertex);
+    new_vertex = matrix_mult(roty, new_vertex);
+    new_vertex = matrix_mult(rotz, new_vertex);
 
     new_vertex *= scale;
 
@@ -89,24 +63,54 @@ fn render(
     shader: FragmentShader,
     uniforms: &Uniforms,
 ) {
-    for indices in &model.triangles {
-        let mut projected = [Vector3::zero(); 3];
+    let (sinx, cosx) = rotation.x.sin_cos();
+    let (siny, cosy) = rotation.y.sin_cos();
+    let (sinz, cosz) = rotation.z.sin_cos();
 
-        for (destination, vertex_index) in projected.iter_mut().zip(indices) {
+    let rot_x: [Vector3; 3] = [
+        Vector3::new(1.0, 0.0, 0.0),
+        Vector3::new(0.0, cosx, -sinx),
+        Vector3::new(0.0, sinx, cosx),
+    ];
+    let rot_y: [Vector3; 3] = [
+        Vector3::new(cosy, 0.0, siny),
+        Vector3::new(0.0, 1.0, 0.0),
+        Vector3::new(-siny, 0.0, cosy),
+    ];
+    let rot_z: [Vector3; 3] = [
+        Vector3::new(cosz, -sinz, 0.0),
+        Vector3::new(sinz, cosz, 0.0),
+        Vector3::new(0.0, 0.0, 1.0),
+    ];
+
+    let transformed_vertices: Vec<Vector3> = model
+        .vertices
+        .iter()
+        .map(|vertex| {
             let transformed = transform(
-                model.vertices[*vertex_index],
+                *vertex,
                 translation,
+                &rot_x,
+                &rot_y,
+                &rot_z,
                 scale,
-                rotation,
                 model.center,
             );
 
-            *destination = Vector3::new(
+            Vector3::new(
                 framebuffer.width as f32 * 0.5 + transformed.x * PIXELS_PER_UNIT,
                 framebuffer.height as f32 * 0.5 - transformed.y * PIXELS_PER_UNIT,
                 transformed.z,
-            );
-        }
+            )
+        })
+        .collect();
+
+    for indices in &model.triangles {
+        let projected = [
+            transformed_vertices[indices[0]],
+            transformed_vertices[indices[1]],
+            transformed_vertices[indices[2]],
+        ];
 
         pipeline.render(
             framebuffer,
@@ -147,6 +151,10 @@ fn main() {
 
     let mut framebuffer = Framebuffer::new(window_width as u32, window_height as u32);
 
+    let mut display_texture = window
+        .load_texture_from_image(&raylib_thread, &framebuffer.color_buffer)
+        .expect("Error loading texture from framebuffer");
+
     let wireframe = WireFrame;
     let scanline = FilledScanline;
     let barycentric = FilledBarycentric;
@@ -160,7 +168,9 @@ fn main() {
 
     let mut translation = Vector3::zero();
     let mut rotation = Vector3::zero();
-    let mut scale = 1.0_f32;
+    let mut ship_scale = 1.0_f32;
+    let mut planet_scale = 10_f32;
+    let mut star_scale = 10_f32;
     let shaders = shaders::registry();
     let mut active_shader = STAR_SHADER.to_owned();
     let start_time = Instant::now();
@@ -221,9 +231,9 @@ fn main() {
         render(
             &mut framebuffer,
             translation,
-            scale,
+            star_scale,
             rotation,
-            &ship_model,
+            &sphere_model,
             pipeline,
             shader,
             &uniforms,
@@ -233,6 +243,6 @@ fn main() {
             framebuffer.apply_bloom();
         }
 
-        framebuffer.swap_buffers(&mut window, &raylib_thread, &active_shader);
+        framebuffer.swap_buffers(&mut window, &raylib_thread, &mut display_texture);
     }
 }

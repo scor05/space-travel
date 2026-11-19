@@ -56,12 +56,9 @@ impl TrianglePipeline for FilledScanline {
         uniforms: &Uniforms,
     ) {
         for fragment in self.rasterize(triangle) {
-            framebuffer.set_fragment(
-                fragment.x,
-                fragment.y,
-                fragment.depth,
-                shader(&fragment, uniforms),
-            );
+            framebuffer.shade_fragment(fragment.x, fragment.y, fragment.depth, || {
+                shader(&fragment, uniforms)
+            });
         }
     }
 }
