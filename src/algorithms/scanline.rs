@@ -1,21 +1,33 @@
-use super::triangle::{COVERAGE_EPSILON, Fragment, Triangle, TrianglePipeline};
+use super::triangle::{COVERAGE_EPSILON, FragmentSample, Triangle, TrianglePipeline};
 use crate::framebuffer::Framebuffer;
 use crate::shaders::{FragmentShader, Uniforms};
+use raylib::error::InvalidMeshError;
 use raylib::prelude::Vector3;
 
 pub struct FilledScanline;
 
 impl FilledScanline {
-    pub fn rasterize(&self, triangle: &Triangle) -> Vec<Fragment> {
+    pub fn rasterize<F>(&self, triangle: &Triangle, width: i32, height: i32, mut shade_fragment: F)
+    where
+        F: FnMut(FragmentSample),
+    {
         let [first, second, third] = triangle.vertices;
 
+        let inverse_area = triangle.inverse_area().unwrap_or_default();
+
         if signed_area(first, second, third).abs() <= f32::EPSILON {
-            return Vec::new();
+            return;
         }
 
-        let min_y = first.y.min(second.y).min(third.y).floor() as i32;
-        let max_y = first.y.max(second.y).max(third.y).ceil() as i32;
-        let mut fragments = Vec::new();
+        let calc_min_y = first.y.min(second.y).min(third.y).floor() as i32;
+        let calc_max_y = first.y.max(second.y).max(third.y).ceil() as i32;
+
+        let min_y = calc_min_y.clamp(0, height);
+        let max_y = calc_max_y.clamp(0, height);
+
+        if min_y >= max_y {
+            return;
+        }
 
         for y in min_y..max_y {
             let sample_y = y as f32 + 0.5;
@@ -36,14 +48,19 @@ impl FilledScanline {
             let first_x = (left - 0.5 - COVERAGE_EPSILON).ceil() as i32;
             let last_x = (right - 0.5 + COVERAGE_EPSILON).floor() as i32;
 
+            let first_x = first_x.max(0);
+            let last_x = last_x.min(width - 1);
+
+            if first_x > last_x {
+                continue;
+            }
+
             for x in first_x..=last_x {
-                if let Some(fragment) = triangle.fragment_at(x, y) {
-                    fragments.push(fragment);
+                if let Some(sample) = triangle.sample_at(x, y, inverse_area) {
+                    shade_fragment(sample)
                 }
             }
         }
-
-        fragments
     }
 }
 
@@ -56,11 +73,17 @@ impl TrianglePipeline for FilledScanline {
         emissive: bool,
         uniforms: &Uniforms,
     ) {
-        for fragment in self.rasterize(triangle) {
-            framebuffer.shade_fragment(fragment.x, fragment.y, fragment.depth, emissive, || {
-                shader(&fragment, uniforms)
-            });
-        }
+        self.rasterize(
+            triangle,
+            framebuffer.width as i32,
+            framebuffer.height as i32,
+            |sample| {
+                framebuffer.shade_fragment(sample.x, sample.y, sample.depth, emissive, || {
+                    let fragment = triangle.interpolate_fragment(sample);
+                    shader(&fragment, uniforms)
+                });
+            },
+        );
     }
 }
 
@@ -73,15 +96,12 @@ fn add_edge_intersections(
     let delta_y = end.y - start.y;
 
     if delta_y.abs() <= f32::EPSILON {
-        if (sample_y - start.y).abs() <= COVERAGE_EPSILON {
-            intersections.push(start.x);
-            intersections.push(end.x);
-        }
         return;
     }
 
     let minimum_y = start.y.min(end.y);
     let maximum_y = start.y.max(end.y);
+
     if sample_y < minimum_y - COVERAGE_EPSILON || sample_y > maximum_y + COVERAGE_EPSILON {
         return;
     }

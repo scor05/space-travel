@@ -6,6 +6,7 @@ use std::collections::HashMap;
 pub struct Uniforms {
     pub time: f32,
     pub light_position: Vector3,
+    pub camera_position: Vector3,
 }
 
 pub type FragmentShader = fn(&Fragment, &Uniforms) -> Color;
@@ -26,7 +27,7 @@ pub fn registry() -> HashMap<String, FragmentShader> {
 }
 
 fn star(fragment: &Fragment, uniforms: &Uniforms) -> Color {
-    let position = normalize(fragment.position);
+    let position = normalize(fragment.local_position);
     let time = uniforms.time;
 
     let warp = fbm(
@@ -68,8 +69,9 @@ fn star(fragment: &Fragment, uniforms: &Uniforms) -> Color {
 }
 
 fn rocky_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
-    let position = normalize(fragment.position);
-    let light_direction = normalize(uniforms.light_position - fragment.position);
+    let position = normalize(fragment.local_position);
+    let normal = normalize(fragment.world_normal);
+    let light_direction = normalize(uniforms.light_position - fragment.world_position);
 
     let continent_warp = fbm(position * 1.8, 3, 300);
     let terrain = fbm(
@@ -119,7 +121,7 @@ fn rocky_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
         ColorF::BLACK,
     );
 
-    let diffuse = dot(position, light_direction).max(0.0);
+    let diffuse = dot(normal, light_direction).max(0.0);
     let illumination = 0.10 + diffuse * 0.90;
     surface = combine(
         surface,
@@ -128,12 +130,9 @@ fn rocky_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
         ColorF::rgb(0.0, 0.008, 0.018),
     );
 
-    let reflected = reflect(-light_direction, position);
-    let specular = dot(reflected, Vector3::new(0.0, 0.0, -1.0))
-        .max(0.0)
-        .powf(48.0)
-        * (1.0 - land_mask)
-        * diffuse;
+    let reflected = reflect(-light_direction, normal);
+    let view_direction = normalize(uniforms.camera_position - fragment.world_position);
+    let specular = dot(reflected, view_direction).max(0.0).powf(48.0) * (1.0 - land_mask) * diffuse;
     surface = combine(
         ColorF::rgb(0.68, 0.90, 1.0),
         ColorF::BLACK,
@@ -147,7 +146,8 @@ fn rocky_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
 }
 
 fn gas_giant(fragment: &Fragment, uniforms: &Uniforms) -> Color {
-    let position = normalize(fragment.position);
+    let position = normalize(fragment.local_position);
+    let normal = normalize(fragment.world_normal);
     let flowing = rotate_y(position, uniforms.time * 0.15);
     let broad_noise = fbm(
         flowing * 4.0 + Vector3::new(uniforms.time * 0.3, 0.0, 0.0),
@@ -196,8 +196,8 @@ fn gas_giant(fragment: &Fragment, uniforms: &Uniforms) -> Color {
         atmosphere,
     );
 
-    let light_direction = normalize(uniforms.light_position - fragment.position);
-    let diffuse = dot(position, light_direction).max(0.0);
+    let light_direction = normalize(uniforms.light_position - fragment.world_position);
+    let diffuse = dot(normal, light_direction).max(0.0);
     combine(
         atmosphere,
         ColorF::BLACK,
