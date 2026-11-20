@@ -14,6 +14,8 @@ pub type FragmentShader = fn(&Fragment, &Uniforms) -> Color;
 pub const STAR_SHADER: &str = "Neutron star";
 pub const ROCKY_PLANET_SHADER: &str = "Ocean planet";
 pub const GAS_GIANT_SHADER: &str = "Gas giant";
+pub const GREEN_PLANET_SHADER: &str = "Green planet";
+pub const PURPLE_PLANET_SHADER: &str = "Purple planet";
 
 pub fn registry() -> HashMap<String, FragmentShader> {
     HashMap::from([
@@ -23,6 +25,8 @@ pub fn registry() -> HashMap<String, FragmentShader> {
             rocky_planet as FragmentShader,
         ),
         (GAS_GIANT_SHADER.to_owned(), gas_giant as FragmentShader),
+        (GREEN_PLANET_SHADER.to_owned(), green_planet as FragmentShader),
+        (PURPLE_PLANET_SHADER.to_owned(), purple_planet as FragmentShader),
     ])
 }
 
@@ -205,6 +209,50 @@ fn gas_giant(fragment: &Fragment, uniforms: &Uniforms) -> Color {
         ColorF::rgb(0.008, 0.003, 0.012),
     )
     .to_color()
+}
+
+fn green_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+    let position = normalize(fragment.local_position);
+    let normal = normalize(fragment.world_normal);
+    let light_direction = normalize(uniforms.light_position - fragment.world_position);
+
+    let vegetation = fbm(position * 5.0, 4, 4103);
+    let detail = fbm(position * 22.0, 2, 4211);
+    let forest = mix(
+        ColorF::rgb(0.025, 0.18, 0.045),
+        ColorF::rgb(0.24, 0.72, 0.10),
+        smoothstep(0.30, 0.70, vegetation),
+    );
+    let surface = mix(
+        forest,
+        ColorF::rgb(0.48, 0.80, 0.20),
+        smoothstep(0.55, 0.75, detail) * 0.45,
+    );
+
+    let diffuse = dot(normal, light_direction).max(0.0);
+    (surface * (0.15 + diffuse * 0.85)).to_color()
+}
+
+fn purple_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+    let position = normalize(fragment.local_position);
+    let normal = normalize(fragment.world_normal);
+    let light_direction = normalize(uniforms.light_position - fragment.world_position);
+
+    let warp = fbm(position * 4.0, 3, 5107);
+    let cells = cellular(
+        position * 9.0 + Vector3::new(warp, -warp * 0.7, warp * 0.5),
+        5227,
+    );
+    let veins = 1.0 - smoothstep(0.04, 0.15, (cells - 0.45).abs());
+    let rock = mix(
+        ColorF::rgb(0.20, 0.035, 0.38),
+        ColorF::rgb(0.55, 0.18, 0.75),
+        warp,
+    );
+    let surface = mix(rock, ColorF::rgb(0.82, 0.48, 0.95), veins * 0.75);
+
+    let diffuse = dot(normal, light_direction).max(0.0);
+    (surface * (0.15 + diffuse * 0.85)).to_color()
 }
 
 #[derive(Clone, Copy)]

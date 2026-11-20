@@ -23,7 +23,7 @@ const SHIP_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/n
 const SPHERE_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/sphere.obj");
 const STAR_SCALE: f32 = 50.0;
 const STAR_ROTATION_SPEED: f32 = PI / 40.0;
-const PLANET_COUNT: usize = 2;
+const PLANET_COUNT: usize = 4;
 
 const PLANET_1_SCALE: f32 = 7.0;
 const PLANET_2_SCALE: f32 = 12.0;
@@ -33,6 +33,14 @@ const PLANET_1_ORBIT_SPEED: f32 = 3.0;
 const PLANET_2_ORBIT_SPEED: f32 = 5.0;
 const PLANET_1_ROTATION_SPEED: f32 = PI / 20.0;
 const PLANET_2_ROTATION_SPEED: f32 = PI / 30.0;
+const PLANET_3_SCALE: f32 = 10.0;
+const PLANET_4_SCALE: f32 = 14.0;
+const PLANET_3_ORBIT_RADIUS: f32 = 55.0;
+const PLANET_4_ORBIT_RADIUS: f32 = 80.0;
+const PLANET_3_ORBIT_SPEED: f32 = 2.0;
+const PLANET_4_ORBIT_SPEED: f32 = 1.5;
+const PLANET_3_ROTATION_SPEED: f32 = PI / 25.0;
+const PLANET_4_ROTATION_SPEED: f32 = PI / 35.0;
 
 fn matrix_mult(mat: &[Vector3; 3], vec: Vector3) -> Vector3 {
     let mut result = Vector3::zero();
@@ -197,7 +205,7 @@ fn main() {
 
     // plano elíptico como y=0
     // TODO: sumarle 2 para contar la nave también
-    let meshes: [&Model; PLANET_COUNT + 1] = [&sphere_model, &sphere_model, &sphere_model];
+    let meshes: [&Model; PLANET_COUNT + 1] = [&sphere_model; PLANET_COUNT + 1];
 
     // la estrella es el primer elemento, con base a él se calculan todos
     let objects: [&WorldObject; PLANET_COUNT + 1] = [
@@ -243,6 +251,38 @@ fn main() {
             orbit_radius: PLANET_2_ORBIT_RADIUS,
             orbit_speed: PLANET_2_ORBIT_SPEED,
             rotation_speed: PLANET_2_ROTATION_SPEED,
+        },
+        &WorldObject {
+            index: 3,
+            position: system_center
+                + Vector3::new(
+                    -(STAR_SCALE + PLANET_3_ORBIT_RADIUS),
+                    0.0,
+                    STAR_SCALE + PLANET_3_ORBIT_RADIUS,
+                ),
+            rotation: Vector3::zero(),
+            scale: PLANET_3_SCALE,
+            shader: shaders["Green planet"],
+            emissive: false,
+            orbit_radius: PLANET_3_ORBIT_RADIUS,
+            orbit_speed: PLANET_3_ORBIT_SPEED,
+            rotation_speed: PLANET_3_ROTATION_SPEED,
+        },
+        &WorldObject {
+            index: 4,
+            position: system_center
+                + Vector3::new(
+                    STAR_SCALE + PLANET_4_ORBIT_RADIUS,
+                    0.0,
+                    STAR_SCALE + PLANET_4_ORBIT_RADIUS,
+                ),
+            rotation: Vector3::zero(),
+            scale: PLANET_4_SCALE,
+            shader: shaders["Purple planet"],
+            emissive: false,
+            orbit_radius: PLANET_4_ORBIT_RADIUS,
+            orbit_speed: PLANET_4_ORBIT_SPEED,
+            rotation_speed: PLANET_4_ROTATION_SPEED,
         },
     ];
     let mut render_commands = Vec::with_capacity(sphere_model.triangles.len() * (PLANET_COUNT + 1));
