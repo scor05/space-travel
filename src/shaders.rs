@@ -437,7 +437,7 @@ fn rick_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
     let view_direction = normalize(uniforms.camera_position - fragment.world_position);
     let height = fragment.local_position.length() - 0.5;
 
-    // Naranja con remolinos claros
+    // Naranja con remolinos claros y poros oscuros
     let warp = fbm(position * 4.0, 3, 6101);
     let swirl = fbm(
         position * 9.0 + Vector3::new(warp * 1.5, -warp, warp * 1.2),
@@ -451,20 +451,32 @@ fn rick_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
         warp,
     );
     let orange = mix(orange, ColorF::rgb(1.0, 0.80, 0.28), lines * 0.6);
+    let pores = smoothstep(0.64, 0.72, fbm(position * 38.0, 2, 6509));
+    let orange = mix(orange, ColorF::rgb(0.55, 0.22, 0.03), pores * 0.45);
 
-    // Cuencas verdes con centro claro (el monticulo)
+    // Bordes elevados y bultos: mas claros, como en la referencia
+    let ridge = smoothstep(0.004, 0.024, height);
+    let orange = mix(orange, ColorF::rgb(1.0, 0.78, 0.38), ridge * 0.55);
+
+    // Cuencas verdes con musgo oscuro, anillos y centro claro
     let green_mask = 1.0 - smoothstep(-0.010, -0.002, height);
     let mound = smoothstep(-0.026, -0.016, height);
     let speckle = fbm(position * 30.0, 2, 6307);
+    let moss = smoothstep(0.60, 0.68, fbm(position * 46.0, 2, 6411));
     let green = mix(
         ColorF::rgb(0.08, 0.30, 0.06),
         ColorF::rgb(0.26, 0.52, 0.10),
         speckle,
     );
+    let green = mix(green, ColorF::rgb(0.03, 0.15, 0.04), moss * 0.6);
     let green = mix(green, ColorF::rgb(0.80, 0.90, 0.45), mound);
     let surface = mix(orange, green, green_mask);
 
-    // Luz difusa + resplandor rojizo en el borde, como en la referencia
+    // Contorno oscuro en el borde de cada cuenca (estilo caricatura)
+    let outline = smoothstep(-0.013, -0.007, height) * (1.0 - smoothstep(-0.004, 0.002, height));
+    let surface = mix(surface, ColorF::rgb(0.22, 0.10, 0.02), outline * 0.65);
+
+    // Luz difusa + resplandor rojizo en el borde
     let diffuse = dot(normal, light_direction).max(0.0);
     let glow = (1.0 - dot(normal, view_direction).max(0.0)).powf(3.0);
     (surface * (0.15 + diffuse * 0.85) + ColorF::rgb(0.9, 0.25, 0.25) * (glow * 0.35)).to_color()
