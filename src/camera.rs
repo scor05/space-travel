@@ -18,7 +18,7 @@ impl Camera {
             field_of_view_y: 60.0_f32.to_radians(),
             near_plane: 0.1,
             far_plane: 1_000.0,
-            movement_speed: 30.0,
+            movement_speed: 40.0,
             turn_speed: 1.5,
         }
     }

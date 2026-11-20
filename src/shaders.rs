@@ -16,6 +16,7 @@ pub const ROCKY_PLANET_SHADER: &str = "Ocean planet";
 pub const GAS_GIANT_SHADER: &str = "Gas giant";
 pub const GREEN_PLANET_SHADER: &str = "Green planet";
 pub const PURPLE_PLANET_SHADER: &str = "Purple planet";
+pub const SHIP_SHADER: &str = "Ship";
 
 pub fn registry() -> HashMap<String, FragmentShader> {
     HashMap::from([
@@ -25,9 +26,66 @@ pub fn registry() -> HashMap<String, FragmentShader> {
             rocky_planet as FragmentShader,
         ),
         (GAS_GIANT_SHADER.to_owned(), gas_giant as FragmentShader),
-        (GREEN_PLANET_SHADER.to_owned(), green_planet as FragmentShader),
-        (PURPLE_PLANET_SHADER.to_owned(), purple_planet as FragmentShader),
+        (
+            GREEN_PLANET_SHADER.to_owned(),
+            green_planet as FragmentShader,
+        ),
+        (
+            PURPLE_PLANET_SHADER.to_owned(),
+            purple_planet as FragmentShader,
+        ),
+        (SHIP_SHADER.to_owned(), ship as FragmentShader),
     ])
+}
+
+fn ship(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+    let position = fragment.local_position;
+    let mut normal = normalize(fragment.world_normal);
+    let view_direction = normalize(uniforms.camera_position - fragment.world_position);
+    let light_direction = normalize(uniforms.light_position - fragment.world_position);
+
+    if dot(normal, view_direction) < 0.0 {
+        normal = -normal;
+    }
+
+    let wrapped_diffuse = ((dot(normal, light_direction) + 0.40) / 1.40).clamp(0.0, 1.0);
+    let half_direction = normalize(light_direction + view_direction);
+    let specular = dot(normal, half_direction).max(0.0).powf(20.0) * wrapped_diffuse;
+    let rim = (1.0 - dot(normal, view_direction).max(0.0))
+        .powf(2.0)
+        .clamp(0.0, 1.0);
+
+    let panel_variation =
+        ((position.x * 1.73).sin() * (position.z * 2.11).cos() * 0.5 + 0.5).clamp(0.0, 1.0);
+    let mut hull = mix(
+        ColorF::rgb(0.12, 0.14, 0.18),
+        ColorF::rgb(0.36, 0.39, 0.44),
+        0.24 + panel_variation * 0.60,
+    );
+
+    let longitudinal_seam = repeating_line(position.x + position.z * 0.18, 2.8, 0.025);
+    let cross_seam = repeating_line(position.z - position.x * 0.10, 2.3, 0.025);
+    let seams = longitudinal_seam.max(cross_seam);
+    hull = mix(hull, ColorF::rgb(0.025, 0.035, 0.055), seams * 0.72);
+
+    let stripe_band = 1.0 - smoothstep(0.12, 0.30, (position.y - 0.15).abs());
+    let stripe_segments = smoothstep(0.18, 0.48, (position.x * 1.35).sin().abs());
+    let stripe = stripe_band * (0.30 + stripe_segments * 0.70);
+    hull = mix(hull, ColorF::rgb(0.025, 0.42, 0.58), stripe * 0.78);
+
+    let scratch_wave = (position.x * 9.7 + position.z * 3.1).sin().abs();
+    let scratches = smoothstep(0.975, 0.997, scratch_wave) * (1.0 - stripe_band);
+    hull = mix(hull, ColorF::rgb(0.52, 0.55, 0.57), scratches * 0.24);
+
+    let illumination = 0.46 + wrapped_diffuse * 0.48;
+    let lit_hull = hull * illumination;
+
+    let pulse = 0.88 + (uniforms.time * 2.4).sin() * 0.12;
+    let emissive_stripe = ColorF::rgb(0.02, 0.36, 0.62) * (stripe * pulse * 0.42);
+    let highlight = ColorF::rgb(0.82, 0.88, 0.96) * (specular * 0.32);
+    let rim_light = ColorF::rgb(0.10, 0.28, 0.46) * (rim * 0.24);
+
+    (lit_hull + emissive_stripe + highlight + rim_light).to_color()
 }
 
 fn star(fragment: &Fragment, uniforms: &Uniforms) -> Color {
@@ -291,6 +349,14 @@ impl std::ops::Mul<f32> for ColorF {
     }
 }
 
+impl std::ops::Add for ColorF {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self::rgb(self.r + other.r, self.g + other.g, self.b + other.b)
+    }
+}
+
 fn combine(a: ColorF, b: ColorF, c: ColorF, d: ColorF) -> ColorF {
     ColorF::rgb(
         ((a.r - b.r) * c.r + d.r).clamp(0.0, 1.0),
@@ -301,6 +367,12 @@ fn combine(a: ColorF, b: ColorF, c: ColorF, d: ColorF) -> ColorF {
 
 fn mix(start: ColorF, end: ColorF, amount: f32) -> ColorF {
     combine(end, start, ColorF::splat(amount), start)
+}
+
+fn repeating_line(value: f32, spacing: f32, width: f32) -> f32 {
+    let phase = (value / spacing).rem_euclid(1.0);
+    let distance_to_line = phase.min(1.0 - phase);
+    1.0 - smoothstep(width, width * 2.4, distance_to_line)
 }
 
 fn normalize(vector: Vector3) -> Vector3 {

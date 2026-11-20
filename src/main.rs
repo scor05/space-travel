@@ -13,6 +13,7 @@ use camera::Camera;
 use framebuffer::Framebuffer;
 use model::Model;
 use parallelism::{RenderCommand, thread::render_parallel_bands};
+use raylib::ease::quad_in;
 use raylib::prelude::*;
 use shaders::Uniforms;
 use std::f32::consts::PI;
@@ -24,13 +25,14 @@ const SPHERE_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj
 const STAR_SCALE: f32 = 50.0;
 const STAR_ROTATION_SPEED: f32 = PI / 40.0;
 const PLANET_COUNT: usize = 4;
+const SHIP_SCALE: f32 = 0.70;
 
 const PLANET_1_SCALE: f32 = 7.0;
 const PLANET_2_SCALE: f32 = 12.0;
-const PLANET_1_ORBIT_RADIUS: f32 = 4.0;
-const PLANET_2_ORBIT_RADIUS: f32 = 30.0;
-const PLANET_1_ORBIT_SPEED: f32 = 3.0;
-const PLANET_2_ORBIT_SPEED: f32 = 5.0;
+const PLANET_1_ORBIT_RADIUS: f32 = 20.0;
+const PLANET_2_ORBIT_RADIUS: f32 = 60.0;
+const PLANET_1_ORBIT_SPEED: f32 = 0.10;
+const PLANET_2_ORBIT_SPEED: f32 = 0.15;
 const PLANET_1_ROTATION_SPEED: f32 = PI / 20.0;
 const PLANET_2_ROTATION_SPEED: f32 = PI / 30.0;
 const PLANET_3_SCALE: f32 = 10.0;
@@ -201,26 +203,33 @@ fn main() {
     let shaders = shaders::registry();
     let start_time = Instant::now();
     let system_center: Vector3 = Vector3::new(10.0, 0.0, 10.0);
+    let ship_offset: Vector3 = Vector3::new(3.0, -3.5, 8.0);
     let mut camera = Camera::new(Vector3::new(10.0, 0.0, -140.0));
 
     // plano elíptico como y=0
-    // TODO: sumarle 2 para contar la nave también
-    let meshes: [&Model; PLANET_COUNT + 1] = [&sphere_model; PLANET_COUNT + 1];
+    let meshes: [&Model; PLANET_COUNT + 2] = [
+        &sphere_model,
+        &sphere_model,
+        &sphere_model,
+        &sphere_model,
+        &sphere_model,
+        &ship_model,
+    ];
 
     // la estrella es el primer elemento, con base a él se calculan todos
-    let objects: [&WorldObject; PLANET_COUNT + 1] = [
-        &WorldObject {
+    let mut objects: [WorldObject; PLANET_COUNT + 2] = [
+        WorldObject {
             index: 0,
             position: system_center,
+            offset: Vector3::zero(),
             scale: STAR_SCALE,
             rotation: Vector3::zero(),
             shader: shaders["Neutron star"],
             emissive: true,
-            orbit_radius: 0.0,
             orbit_speed: 0.0,
             rotation_speed: STAR_ROTATION_SPEED,
         },
-        &WorldObject {
+        WorldObject {
             index: 1,
             position: system_center
                 + Vector3::new(
@@ -228,15 +237,19 @@ fn main() {
                     0.0,
                     -(STAR_SCALE + PLANET_1_ORBIT_RADIUS),
                 ),
+            offset: Vector3::new(
+                -(STAR_SCALE + PLANET_1_ORBIT_RADIUS),
+                0.0,
+                -(STAR_SCALE + PLANET_1_ORBIT_RADIUS),
+            ),
             rotation: Vector3::zero(),
             scale: PLANET_1_SCALE,
             shader: shaders["Ocean planet"],
             emissive: false,
-            orbit_radius: PLANET_1_ORBIT_RADIUS,
             orbit_speed: PLANET_1_ORBIT_SPEED,
             rotation_speed: PLANET_1_ROTATION_SPEED,
         },
-        &WorldObject {
+        WorldObject {
             index: 2,
             position: system_center
                 + Vector3::new(
@@ -244,15 +257,19 @@ fn main() {
                     0.0,
                     -(STAR_SCALE + PLANET_2_ORBIT_RADIUS),
                 ),
+            offset: Vector3::new(
+                STAR_SCALE + PLANET_2_ORBIT_RADIUS,
+                0.0,
+                -(STAR_SCALE + PLANET_2_ORBIT_RADIUS),
+            ),
             rotation: Vector3::zero(),
             scale: PLANET_2_SCALE,
             shader: shaders["Gas giant"],
             emissive: false,
-            orbit_radius: PLANET_2_ORBIT_RADIUS,
             orbit_speed: PLANET_2_ORBIT_SPEED,
             rotation_speed: PLANET_2_ROTATION_SPEED,
         },
-        &WorldObject {
+        WorldObject {
             index: 3,
             position: system_center
                 + Vector3::new(
@@ -260,15 +277,19 @@ fn main() {
                     0.0,
                     STAR_SCALE + PLANET_3_ORBIT_RADIUS,
                 ),
+            offset: Vector3::new(
+                -(STAR_SCALE + PLANET_3_ORBIT_RADIUS),
+                0.0,
+                STAR_SCALE + PLANET_3_ORBIT_RADIUS,
+            ),
             rotation: Vector3::zero(),
             scale: PLANET_3_SCALE,
             shader: shaders["Green planet"],
             emissive: false,
-            orbit_radius: PLANET_3_ORBIT_RADIUS,
             orbit_speed: PLANET_3_ORBIT_SPEED,
             rotation_speed: PLANET_3_ROTATION_SPEED,
         },
-        &WorldObject {
+        WorldObject {
             index: 4,
             position: system_center
                 + Vector3::new(
@@ -276,19 +297,45 @@ fn main() {
                     0.0,
                     STAR_SCALE + PLANET_4_ORBIT_RADIUS,
                 ),
+            offset: Vector3::new(
+                STAR_SCALE + PLANET_4_ORBIT_RADIUS,
+                0.0,
+                STAR_SCALE + PLANET_4_ORBIT_RADIUS,
+            ),
             rotation: Vector3::zero(),
             scale: PLANET_4_SCALE,
             shader: shaders["Purple planet"],
             emissive: false,
-            orbit_radius: PLANET_4_ORBIT_RADIUS,
             orbit_speed: PLANET_4_ORBIT_SPEED,
             rotation_speed: PLANET_4_ROTATION_SPEED,
         },
+        WorldObject {
+            index: 5,
+            position: camera.position + ship_offset,
+            offset: ship_offset,
+            rotation: Vector3::new(0.0, camera.yaw + PI / 2.5, 0.0),
+            scale: SHIP_SCALE,
+            shader: shaders["Ship"],
+            emissive: false,
+            orbit_speed: 0.0,
+            rotation_speed: 0.0,
+        },
     ];
+
     let mut render_commands = Vec::with_capacity(sphere_model.triangles.len() * (PLANET_COUNT + 1));
 
     while !window.window_should_close() {
-        camera.update(&window, window.get_frame_time());
+        let delta_time = window.get_frame_time();
+        camera.update(&window, delta_time);
+
+        let (sin_yaw, cos_yaw) = camera.yaw.sin_cos();
+        let right = Vector3::new(cos_yaw, 0.0, -sin_yaw);
+        let up = Vector3::new(0.0, 1.0, 0.0);
+        let forward = Vector3::new(sin_yaw, 0.0, cos_yaw);
+
+        objects[objects.len() - 1].position =
+            camera.position + right * ship_offset.x + up * ship_offset.y + forward * ship_offset.z;
+        objects[objects.len() - 1].rotation = Vector3::new(0.0, camera.yaw + PI / 2.25, 0.0);
 
         framebuffer.clear();
         render_commands.clear();
@@ -299,7 +346,20 @@ fn main() {
             camera_position: camera.position,
         };
 
-        for (mesh, obj) in meshes.iter().zip(objects.iter()) {
+        for (mesh, obj) in meshes.iter().zip(objects.iter_mut()) {
+            if obj.index > 0 && obj.index != PLANET_COUNT + 1 {
+                let time = start_time.elapsed().as_secs_f32();
+                // offset ya cuenta el orbit radius del planeta
+                obj.position = system_center
+                    + Vector3::new(
+                        obj.offset.x * (time * obj.orbit_speed).cos(),
+                        0.0,
+                        obj.offset.z * (time * obj.orbit_speed).sin(),
+                    );
+            }
+
+            obj.rotation += Vector3::new(0.0, obj.rotation_speed * delta_time, 0.0);
+
             append_object_commands(
                 &mut render_commands,
                 framebuffer.width,
