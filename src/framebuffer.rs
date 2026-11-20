@@ -1,3 +1,4 @@
+use crate::parallelism::thread::BandBuffer;
 use raylib::prelude::*;
 
 // current_color sirve para pintar varios pixeles a la vez del mismo color
@@ -39,6 +40,28 @@ impl Framebuffer {
         self.color_buffer.clear_background(self.background_color);
         self.emissive_buffer.clear_background(Color::BLANK);
         self.depth_buffer.fill(f32::INFINITY);
+    }
+
+    pub fn merge_band(&mut self, band: &BandBuffer) {
+        assert_eq!(band.width, self.width as i32);
+
+        for y in band.start_y..band.end_y {
+            for x in 0..band.width {
+                let band_index = band.index(x, y);
+                if !band.depth[band_index].is_finite() {
+                    continue;
+                }
+
+                let framebuffer_index = y as usize * self.width as usize + x as usize;
+
+                self.depth_buffer[framebuffer_index] = band.depth[band_index];
+                self.color_buffer.draw_pixel(x, y, band.color[band_index]);
+                if band.emissive[band_index].a > 0 {
+                    self.emissive_buffer
+                        .draw_pixel(x, y, band.emissive[band_index]);
+                }
+            }
+        }
     }
 
     pub fn set_pixel(&mut self, x: u32, y: u32) {

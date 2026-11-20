@@ -8,14 +8,11 @@ mod procedural;
 mod shaders;
 mod worldobjects;
 
-use algorithms::barycentric::FilledBarycentric;
-use algorithms::scanline::FilledScanline;
-use algorithms::triangle::{Triangle, TriangleMode, TrianglePipeline};
-use algorithms::wireframe::WireFrame;
+use algorithms::triangle::Triangle;
 use camera::Camera;
 use framebuffer::Framebuffer;
 use model::Model;
-use parallelism::*;
+use parallelism::{RenderCommand, thread::render_parallel_bands};
 use raylib::prelude::*;
 use shaders::Uniforms;
 use std::f32::consts::PI;
@@ -77,13 +74,13 @@ fn transform(
     new_vertex
 }
 
-fn render(
-    framebuffer: &mut Framebuffer,
+fn append_object_commands(
+    commands: &mut Vec<RenderCommand>,
+    framebuffer_width: u32,
+    framebuffer_height: u32,
     mesh: &Model,
     object: &WorldObject,
     camera: &Camera,
-    pipeline: &dyn TrianglePipeline,
-    uniforms: &Uniforms,
 ) {
     let (sinx, cosx) = object.rotation.x.sin_cos();
     let (siny, cosy) = object.rotation.y.sin_cos();
@@ -126,7 +123,7 @@ fn render(
 
             let view_position = camera.world_to_view(world_position);
             let screen_position =
-                camera.project(view_position, framebuffer.width, framebuffer.height);
+                camera.project(view_position, framebuffer_width, framebuffer_height);
 
             (screen_position, world_position, world_normal)
         })
@@ -141,12 +138,9 @@ fn render(
             continue;
         };
 
-        let projected = [first, second, third];
-
-        pipeline.render(
-            framebuffer,
-            &Triangle {
-                vertices: projected,
+        commands.push(RenderCommand {
+            triangle: Triangle {
+                vertices: [first, second, third],
                 local_positions: [
                     mesh.vertices[indices[0]],
                     mesh.vertices[indices[1]],
@@ -168,10 +162,9 @@ fn render(
                     mesh.colors[indices[2]],
                 ],
             },
-            object.shader,
-            object.emissive,
-            uniforms,
-        );
+            shader: object.shader,
+            emissive: object.emissive,
+        });
     }
 }
 
@@ -196,17 +189,6 @@ fn main() {
     let mut display_texture = window
         .load_texture_from_image(&raylib_thread, &framebuffer.color_buffer)
         .expect("Error loading texture from framebuffer");
-
-    let wireframe = WireFrame;
-    let scanline = FilledScanline;
-    let barycentric = FilledBarycentric;
-
-    let mode = TriangleMode::FilledScanline;
-    let pipeline: &dyn TrianglePipeline = match mode {
-        TriangleMode::Wireframe => &wireframe,
-        TriangleMode::FilledBarycentric => &barycentric,
-        TriangleMode::FilledScanline => &scanline,
-    };
 
     let shaders = shaders::registry();
     let start_time = Instant::now();
@@ -263,11 +245,13 @@ fn main() {
             rotation_speed: PLANET_2_ROTATION_SPEED,
         },
     ];
+    let mut render_commands = Vec::with_capacity(sphere_model.triangles.len() * (PLANET_COUNT + 1));
 
     while !window.window_should_close() {
         camera.update(&window, window.get_frame_time());
 
         framebuffer.clear();
+        render_commands.clear();
 
         let uniforms = Uniforms {
             time: start_time.elapsed().as_secs_f32(),
@@ -276,7 +260,26 @@ fn main() {
         };
 
         for (mesh, obj) in meshes.iter().zip(objects.iter()) {
-            render(&mut framebuffer, mesh, obj, &camera, pipeline, &uniforms);
+            append_object_commands(
+                &mut render_commands,
+                framebuffer.width,
+                framebuffer.height,
+                mesh,
+                obj,
+                &camera,
+            );
+        }
+
+        let bands = render_parallel_bands(
+            &render_commands,
+            &uniforms,
+            framebuffer.width as i32,
+            framebuffer.height as i32,
+            framebuffer.background_color,
+        );
+
+        for band in &bands {
+            framebuffer.merge_band(band);
         }
 
         framebuffer.apply_bloom();

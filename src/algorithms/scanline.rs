@@ -1,29 +1,32 @@
 use super::triangle::{COVERAGE_EPSILON, FragmentSample, Triangle, TrianglePipeline};
 use crate::framebuffer::Framebuffer;
 use crate::shaders::{FragmentShader, Uniforms};
-use raylib::error::InvalidMeshError;
 use raylib::prelude::Vector3;
 
 pub struct FilledScanline;
 
 impl FilledScanline {
-    pub fn rasterize<F>(&self, triangle: &Triangle, width: i32, height: i32, mut shade_fragment: F)
-    where
+    pub fn rasterize<F>(
+        &self,
+        triangle: &Triangle,
+        width: i32,
+        band_min_y: i32,
+        band_max_y: i32,
+        mut emit_sample: F,
+    ) where
         F: FnMut(FragmentSample),
     {
         let [first, second, third] = triangle.vertices;
 
-        let inverse_area = triangle.inverse_area().unwrap_or_default();
-
-        if signed_area(first, second, third).abs() <= f32::EPSILON {
+        let Some(inverse_area) = triangle.inverse_area() else {
             return;
-        }
+        };
 
         let calc_min_y = first.y.min(second.y).min(third.y).floor() as i32;
         let calc_max_y = first.y.max(second.y).max(third.y).ceil() as i32;
 
-        let min_y = calc_min_y.clamp(0, height);
-        let max_y = calc_max_y.clamp(0, height);
+        let min_y = calc_min_y.clamp(band_min_y, band_max_y);
+        let max_y = calc_max_y.clamp(band_min_y, band_max_y);
 
         if min_y >= max_y {
             return;
@@ -31,19 +34,16 @@ impl FilledScanline {
 
         for y in min_y..max_y {
             let sample_y = y as f32 + 0.5;
-            let mut intersections = Vec::with_capacity(6);
+            let mut left = f32::INFINITY;
+            let mut right = f32::NEG_INFINITY;
 
-            add_edge_intersections(&mut intersections, first, second, sample_y);
-            add_edge_intersections(&mut intersections, second, third, sample_y);
-            add_edge_intersections(&mut intersections, third, first, sample_y);
+            include_edge_intersection(&mut left, &mut right, first, second, sample_y);
+            include_edge_intersection(&mut left, &mut right, second, third, sample_y);
+            include_edge_intersection(&mut left, &mut right, third, first, sample_y);
 
-            if intersections.is_empty() {
+            if !left.is_finite() || !right.is_finite() {
                 continue;
             }
-
-            intersections.sort_by(f32::total_cmp);
-            let left = intersections[0];
-            let right = intersections[intersections.len() - 1];
 
             let first_x = (left - 0.5 - COVERAGE_EPSILON).ceil() as i32;
             let last_x = (right - 0.5 + COVERAGE_EPSILON).floor() as i32;
@@ -57,7 +57,7 @@ impl FilledScanline {
 
             for x in first_x..=last_x {
                 if let Some(sample) = triangle.sample_at(x, y, inverse_area) {
-                    shade_fragment(sample)
+                    emit_sample(sample)
                 }
             }
         }
@@ -76,6 +76,7 @@ impl TrianglePipeline for FilledScanline {
         self.rasterize(
             triangle,
             framebuffer.width as i32,
+            0,
             framebuffer.height as i32,
             |sample| {
                 framebuffer.shade_fragment(sample.x, sample.y, sample.depth, emissive, || {
@@ -87,8 +88,9 @@ impl TrianglePipeline for FilledScanline {
     }
 }
 
-fn add_edge_intersections(
-    intersections: &mut Vec<f32>,
+fn include_edge_intersection(
+    left: &mut f32,
+    right: &mut f32,
     start: Vector3,
     end: Vector3,
     sample_y: f32,
@@ -102,14 +104,12 @@ fn add_edge_intersections(
     let minimum_y = start.y.min(end.y);
     let maximum_y = start.y.max(end.y);
 
-    if sample_y < minimum_y - COVERAGE_EPSILON || sample_y > maximum_y + COVERAGE_EPSILON {
+    if sample_y < minimum_y || sample_y >= maximum_y {
         return;
     }
 
     let interpolation = (sample_y - start.y) / delta_y;
-    intersections.push(start.x + interpolation * (end.x - start.x));
-}
-
-fn signed_area(first: Vector3, second: Vector3, third: Vector3) -> f32 {
-    (second.x - first.x) * (third.y - first.y) - (second.y - first.y) * (third.x - first.x)
+    let x = start.x + interpolation * (end.x - start.x);
+    *left = left.min(x);
+    *right = right.max(x);
 }
