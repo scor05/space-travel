@@ -23,27 +23,27 @@ Capturas del renderer en ejecución (resolución 960x640), con la nave en pantal
 
 ![Vista general del sistema solar](docs/capturas/sistema.png)
 
-### Estrella (Neutron star)
+### Estrella 
 
 ![Estrella de neutrones](docs/capturas/estrella.png)
 
-### Planeta 1 (Ocean planet)
+### Planeta 1 
 
 ![Planeta 1](docs/capturas/planeta1.png)
 
-### Planeta 2 (Gas giant)
+### Planeta 2 
 
 ![Planeta 2](docs/capturas/planeta2.png)
 
-### Planeta 3 (Green planet)
+### Planeta 3 
 
 ![Planeta 3](docs/capturas/planeta3.png)
 
-### Planeta 4 (Purple planet)
+### Planeta 4 
 
 ![Planeta 4](docs/capturas/planeta4.png)
 
-### Planeta 5 (Rick planet)
+### Planeta 5 
 
 ![Planeta 5](docs/capturas/planeta_rick.png)
 
@@ -69,23 +69,23 @@ Para la nave implementamos un shader de casco con paneles, uniones, desgaste, il
 
 Implementamos una estrella de neutrones mediante un shader emisivo animado que combina FBM y ruido celular para producir turbulencia y variación sobre la superficie.
 
-### Ocean planet (planeta 1)
+### t (planeta 1)
 
 Planeta tipo océano. Mezcla océanos azules, continentes café/verdes (según humedad), casquetes de hielo en los polos y nubes animadas que se desplazan con el tiempo y proyectan sombra. Incluye iluminación difusa y un brillo especular sobre el agua.
 
-### Gas giant (planeta 2)
+### (planeta 2)
 
 Gigante gaseoso con bandas de latitud deformadas por ruido y una tormenta con anillos que giran con el tiempo. Las bandas fluyen lentamente para que la atmósfera se vea viva.
 
-### Green planet (planeta 3)
+###  (planeta 3)
 
 Planeta cubierto de vegetación: FBM a dos escalas para zonas de bosque oscuro y claro, con iluminación difusa.
 
-### Purple planet (planeta 4)
+###  (planeta 4)
 
 Planeta volcánico de roca morada oscura con fisuras de lava generadas con ruido, y un lago de lava dentro del cráter principal del modelo. La lava pulsa y fluye con el tiempo, y sigue brillando en el lado nocturno.
 
-### Rick planet (planeta 5)
+### (planeta 5)
 
 Planeta naranja inspirado en Rick and Morty. El shader lee la altura real de la malla (distancia al centro menos el radio base) para colorear: las cuencas hundidas son verdes con musgo, los anillos y montículos centrales son verde claro, y los bordes y bultos elevados son naranja claro. Añade remolinos y poros con ruido, un contorno oscuro en el borde de cada cuenca y un resplandor rojizo en el borde del planeta.
 
