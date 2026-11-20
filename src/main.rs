@@ -22,6 +22,10 @@ use worldobjects::WorldObject;
 
 const SHIP_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/nave.obj");
 const SPHERE_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/sphere.obj");
+const GREEN_PLANET_MODEL_PATH: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planeta_verde.obj");
+const PURPLE_PLANET_MODEL_PATH: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planeta_morado.obj");
 const STAR_SCALE: f32 = 50.0;
 const STAR_ROTATION_SPEED: f32 = PI / 40.0;
 const PLANET_COUNT: usize = 4;
@@ -183,6 +187,10 @@ fn main() {
         .unwrap_or_else(|error| panic!("Could not load {SHIP_MODEL_PATH}: {error}"));
     let sphere_model = Model::load(SPHERE_MODEL_PATH)
         .unwrap_or_else(|error| panic!("Could not load {SPHERE_MODEL_PATH}: {error}"));
+    let green_planet_model = Model::load(GREEN_PLANET_MODEL_PATH)
+        .unwrap_or_else(|error| panic!("Could not load {GREEN_PLANET_MODEL_PATH}: {error}"));
+    let purple_planet_model = Model::load(PURPLE_PLANET_MODEL_PATH)
+        .unwrap_or_else(|error| panic!("Could not load {PURPLE_PLANET_MODEL_PATH}: {error}"));
 
     let window_width = 600;
     let window_height = 400;
@@ -211,8 +219,8 @@ fn main() {
         &sphere_model,
         &sphere_model,
         &sphere_model,
-        &sphere_model,
-        &sphere_model,
+        &green_planet_model,
+        &purple_planet_model,
         &ship_model,
     ];
 
