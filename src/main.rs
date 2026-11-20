@@ -26,6 +26,7 @@ const GREEN_PLANET_MODEL_PATH: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planeta_verde.obj");
 const PURPLE_PLANET_MODEL_PATH: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planeta_morado.obj");
+const PLANET_1_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planet1.obj");
 const STAR_SCALE: f32 = 50.0;
 const STAR_ROTATION_SPEED: f32 = PI / 40.0;
 const PLANET_COUNT: usize = 4;
@@ -192,6 +193,9 @@ fn main() {
     let purple_planet_model = Model::load(PURPLE_PLANET_MODEL_PATH)
         .unwrap_or_else(|error| panic!("Could not load {PURPLE_PLANET_MODEL_PATH}: {error}"));
 
+    let planet1_model = Model::load(PLANET_1_MODEL_PATH)
+        .unwrap_or_else(|error| panic!("Could not load {PLANET_1_MODEL_PATH}: {error}"));
+
     let window_width = 600;
     let window_height = 400;
 
@@ -217,7 +221,7 @@ fn main() {
     // plano elíptico como y=0
     let meshes: [&Model; PLANET_COUNT + 2] = [
         &sphere_model,
-        &sphere_model,
+        &planet1_model,
         &sphere_model,
         &green_planet_model,
         &purple_planet_model,
