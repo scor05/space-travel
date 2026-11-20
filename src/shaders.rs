@@ -297,20 +297,42 @@ fn purple_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
     let light_direction = normalize(uniforms.light_position - fragment.world_position);
 
     let warp = fbm(position * 4.0, 3, 5107);
-    let cells = cellular(
-        position * 9.0 + Vector3::new(warp, -warp * 0.7, warp * 0.5),
+    let terrain = fbm(
+        position * 7.0 + Vector3::new(warp, -warp * 0.7, warp * 0.5),
+        3,
         5227,
     );
-    let veins = 1.0 - smoothstep(0.04, 0.15, (cells - 0.45).abs());
+    // Fixed fissures in the crust, with heat flowing inside them.
+    let fissure_distance = (terrain - 0.5).abs();
+    let cracks = 1.0 - smoothstep(0.012, 0.045, fissure_distance);
+    let hot_core = 1.0 - smoothstep(0.003, 0.018, fissure_distance);
+
+    // Lava lake inside the large front crater of planeta_morado.obj.
+    let crater_direction = normalize(Vector3::new(0.2, 0.3, -1.0));
+    let crater_distance = dot(position, crater_direction).clamp(-1.0, 1.0).acos();
+    let lava_lake = 1.0 - smoothstep(0.16, 0.25, crater_distance);
+    let lava_mask = cracks.max(lava_lake);
+    let flow = fbm(
+        position * 12.0 + Vector3::new(0.0, -uniforms.time * 0.4, uniforms.time * 0.15),
+        2,
+        5309,
+    );
+    let pulse = 0.5 + 0.5 * (uniforms.time * 2.0 + warp * 9.0).sin();
     let rock = mix(
-        ColorF::rgb(0.20, 0.035, 0.38),
-        ColorF::rgb(0.55, 0.18, 0.75),
+        ColorF::rgb(0.035, 0.018, 0.045),
+        ColorF::rgb(0.16, 0.08, 0.18),
         warp,
     );
-    let surface = mix(rock, ColorF::rgb(0.82, 0.48, 0.95), veins * 0.75);
-
     let diffuse = dot(normal, light_direction).max(0.0);
-    (surface * (0.15 + diffuse * 0.85)).to_color()
+    let lit_rock = rock * (0.18 + diffuse * 0.82);
+    let lava = mix(
+        ColorF::rgb(0.85, 0.055, 0.005),
+        ColorF::rgb(1.0, 0.85, 0.20),
+        hot_core.max(lava_lake) * (0.35 + flow * 0.50 + pulse * 0.15),
+    );
+
+    // Lava remains bright on the night side; only the rock receives sunlight.
+    mix(lit_rock, lava, lava_mask).to_color()
 }
 
 #[derive(Clone, Copy)]
