@@ -17,14 +17,35 @@ El video demostrativo de la ejecución de nuestro proyecto se puede ver (https:/
 
 ## Capturas
 
-Capturas tomadas del video de demostración:
+Capturas del renderer en ejecución (resolución 960x640), con la nave en pantalla:
 
-<!-- Guardar las capturas en docs/capturas/ y descomentar las líneas que correspondan:
+### Vista general del sistema
+
 ![Vista general del sistema solar](docs/capturas/sistema.png)
-![Acercamiento al planeta 1](docs/capturas/planeta1.png)
-![Planeta de Rick and Morty](docs/capturas/planeta_rick.png)
-![Planetas verde y morado](docs/capturas/planetas_adair.png)
--->
+
+### Estrella (Neutron star)
+
+![Estrella de neutrones](docs/capturas/estrella.png)
+
+### Planeta 1 (Ocean planet)
+
+![Planeta 1](docs/capturas/planeta1.png)
+
+### Planeta 2 (Gas giant)
+
+![Planeta 2](docs/capturas/planeta2.png)
+
+### Planeta 3 (Green planet)
+
+![Planeta 3](docs/capturas/planeta3.png)
+
+### Planeta 4 (Purple planet)
+
+![Planeta 4](docs/capturas/planeta4.png)
+
+### Planeta 5 (Rick planet)
+
+![Planeta 5](docs/capturas/planeta_rick.png)
 
 
 ## Controles
