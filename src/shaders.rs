@@ -17,6 +17,7 @@ pub const GAS_GIANT_SHADER: &str = "Gas giant";
 pub const GREEN_PLANET_SHADER: &str = "Green planet";
 pub const PURPLE_PLANET_SHADER: &str = "Purple planet";
 pub const SHIP_SHADER: &str = "Ship";
+pub const RICK_PLANET_SHADER: &str = "Rick planet";
 
 pub fn registry() -> HashMap<String, FragmentShader> {
     HashMap::from([
@@ -35,6 +36,10 @@ pub fn registry() -> HashMap<String, FragmentShader> {
             purple_planet as FragmentShader,
         ),
         (SHIP_SHADER.to_owned(), ship as FragmentShader),
+        (
+            RICK_PLANET_SHADER.to_owned(),
+            rick_planet as FragmentShader,
+        ),
     ])
 }
 
@@ -421,4 +426,46 @@ fn rotate_y(point: Vector3, angle: f32) -> Vector3 {
         point.y,
         -point.x * sin + point.z * cos,
     )
+}
+
+// Planeta naranja con cuencas verdes (planet1.obj). El color sale de la altura
+// real de la malla: radio - 0.5 < 0 dentro de las cuencas, > 0 en los bordes.
+fn rick_planet(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+    let position = normalize(fragment.local_position);
+    let normal = normalize(fragment.world_normal);
+    let light_direction = normalize(uniforms.light_position - fragment.world_position);
+    let view_direction = normalize(uniforms.camera_position - fragment.world_position);
+    let height = fragment.local_position.length() - 0.5;
+
+    // Naranja con remolinos claros
+    let warp = fbm(position * 4.0, 3, 6101);
+    let swirl = fbm(
+        position * 9.0 + Vector3::new(warp * 1.5, -warp, warp * 1.2),
+        3,
+        6203,
+    );
+    let lines = 1.0 - smoothstep(0.0, 0.05, (swirl - 0.5).abs());
+    let orange = mix(
+        ColorF::rgb(0.80, 0.36, 0.05),
+        ColorF::rgb(0.97, 0.62, 0.10),
+        warp,
+    );
+    let orange = mix(orange, ColorF::rgb(1.0, 0.80, 0.28), lines * 0.6);
+
+    // Cuencas verdes con centro claro (el monticulo)
+    let green_mask = 1.0 - smoothstep(-0.010, -0.002, height);
+    let mound = smoothstep(-0.026, -0.016, height);
+    let speckle = fbm(position * 30.0, 2, 6307);
+    let green = mix(
+        ColorF::rgb(0.08, 0.30, 0.06),
+        ColorF::rgb(0.26, 0.52, 0.10),
+        speckle,
+    );
+    let green = mix(green, ColorF::rgb(0.80, 0.90, 0.45), mound);
+    let surface = mix(orange, green, green_mask);
+
+    // Luz difusa + resplandor rojizo en el borde, como en la referencia
+    let diffuse = dot(normal, light_direction).max(0.0);
+    let glow = (1.0 - dot(normal, view_direction).max(0.0)).powf(3.0);
+    (surface * (0.15 + diffuse * 0.85) + ColorF::rgb(0.9, 0.25, 0.25) * (glow * 0.35)).to_color()
 }

@@ -26,10 +26,12 @@ const GREEN_PLANET_MODEL_PATH: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planeta_verde.obj");
 const PURPLE_PLANET_MODEL_PATH: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planeta_morado.obj");
+const RICK_PLANET_MODEL_PATH: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planeta_rick.obj");
 const PLANET_1_MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/obj/planet1.obj");
 const STAR_SCALE: f32 = 50.0;
 const STAR_ROTATION_SPEED: f32 = PI / 40.0;
-const PLANET_COUNT: usize = 4;
+const PLANET_COUNT: usize = 5;
 const SHIP_SCALE: f32 = 0.70;
 
 const PLANET_1_SCALE: f32 = 7.0;
@@ -42,12 +44,16 @@ const PLANET_1_ROTATION_SPEED: f32 = PI / 20.0;
 const PLANET_2_ROTATION_SPEED: f32 = PI / 30.0;
 const PLANET_3_SCALE: f32 = 10.0;
 const PLANET_4_SCALE: f32 = 14.0;
-const PLANET_3_ORBIT_RADIUS: f32 = 55.0;
-const PLANET_4_ORBIT_RADIUS: f32 = 80.0;
-const PLANET_3_ORBIT_SPEED: f32 = 2.0;
-const PLANET_4_ORBIT_SPEED: f32 = 1.5;
+const PLANET_3_ORBIT_RADIUS: f32 = 90.0;
+const PLANET_4_ORBIT_RADIUS: f32 = 130.0;
+const PLANET_3_ORBIT_SPEED: f32 = 0.08;
+const PLANET_4_ORBIT_SPEED: f32 = 0.05;
 const PLANET_3_ROTATION_SPEED: f32 = PI / 25.0;
 const PLANET_4_ROTATION_SPEED: f32 = PI / 35.0;
+const PLANET_5_SCALE: f32 = 9.0;
+const PLANET_5_ORBIT_RADIUS: f32 = 170.0;
+const PLANET_5_ORBIT_SPEED: f32 = 0.035;
+const PLANET_5_ROTATION_SPEED: f32 = PI / 28.0;
 
 fn matrix_mult(mat: &[Vector3; 3], vec: Vector3) -> Vector3 {
     let mut result = Vector3::zero();
@@ -193,6 +199,8 @@ fn main() {
     let purple_planet_model = Model::load(PURPLE_PLANET_MODEL_PATH)
         .unwrap_or_else(|error| panic!("Could not load {PURPLE_PLANET_MODEL_PATH}: {error}"));
 
+    let rick_planet_model = Model::load(RICK_PLANET_MODEL_PATH)
+        .unwrap_or_else(|error| panic!("Could not load {RICK_PLANET_MODEL_PATH}: {error}"));
     let planet1_model = Model::load(PLANET_1_MODEL_PATH)
         .unwrap_or_else(|error| panic!("Could not load {PLANET_1_MODEL_PATH}: {error}"));
 
@@ -225,6 +233,7 @@ fn main() {
         &sphere_model,
         &green_planet_model,
         &purple_planet_model,
+        &rick_planet_model,
         &ship_model,
     ];
 
@@ -323,6 +332,26 @@ fn main() {
         },
         WorldObject {
             index: 5,
+            position: system_center
+                + Vector3::new(
+                    -(STAR_SCALE + PLANET_5_ORBIT_RADIUS),
+                    0.0,
+                    -(STAR_SCALE + PLANET_5_ORBIT_RADIUS),
+                ),
+            offset: Vector3::new(
+                -(STAR_SCALE + PLANET_5_ORBIT_RADIUS),
+                0.0,
+                -(STAR_SCALE + PLANET_5_ORBIT_RADIUS),
+            ),
+            rotation: Vector3::zero(),
+            scale: PLANET_5_SCALE,
+            shader: shaders["Rick planet"],
+            emissive: false,
+            orbit_speed: PLANET_5_ORBIT_SPEED,
+            rotation_speed: PLANET_5_ROTATION_SPEED,
+        },
+        WorldObject {
+            index: 6,
             position: camera.position + ship_offset,
             offset: ship_offset,
             rotation: Vector3::new(0.0, camera.yaw + PI / 2.5, 0.0),
